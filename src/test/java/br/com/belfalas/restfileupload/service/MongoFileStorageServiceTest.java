@@ -6,6 +6,7 @@ import com.mongodb.client.gridfs.GridFSFindIterable;
 import com.mongodb.client.gridfs.model.GridFSFile;
 import org.apache.commons.compress.utils.IOUtils;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +30,15 @@ class MongoFileStorageServiceTest {
 
     @Autowired
     GridFsTemplate gridFsTemplate;
+
+    @AfterEach
+    void teardown(){
+        GridFSFindIterable gridFSFiles = gridFsTemplate.find(new Query());
+
+        for (GridFSFile file : gridFSFiles) {
+            gridFsTemplate.delete(Query.query(Criteria.where("_id").is(file.getId())));
+        }
+    }
 
     @Test
     void save() throws IOException {
