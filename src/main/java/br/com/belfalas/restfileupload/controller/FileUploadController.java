@@ -1,11 +1,13 @@
 package br.com.belfalas.restfileupload.controller;
 
 import br.com.belfalas.restfileupload.dto.FileDTO;
+import br.com.belfalas.restfileupload.dto.ImageDTO;
 import br.com.belfalas.restfileupload.service.FileStorageService;
 import br.com.belfalas.restfileupload.validation.ValidUploadImageFile;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.util.Pair;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -57,16 +59,10 @@ public class FileUploadController {
             @PathVariable
                     String filename
     ) throws IOException {
-        byte[] image = fileStorageService.find(userId, filename);
+        ImageDTO result = fileStorageService.find(userId, filename);
 
-        MediaType mediaType = MediaType.IMAGE_PNG; //default value
-        if (filename.endsWith(".jpg") || filename.endsWith(".jpeg") || filename.endsWith(".jfif")) {
-            mediaType = MediaType.IMAGE_JPEG;
-        } else if (filename.endsWith(".gif")) {
-            mediaType = MediaType.IMAGE_GIF;
-        } else if (filename.endsWith(".bmp")){
-            mediaType = MediaType.parseMediaType("image/bmp");
-        }
+        MediaType mediaType = MediaType.parseMediaType(result.getContentType());
+        byte[] image = result.getImage();
 
         return ResponseEntity.ok().contentType(mediaType).contentLength(image.length).body(image);
     }

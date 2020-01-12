@@ -1,116 +1,149 @@
 package br.com.belfalas.restfileupload.service;
 
 import br.com.belfalas.restfileupload.dto.FileDTO;
-import com.mongodb.BasicDBObjectBuilder;
+import br.com.belfalas.restfileupload.dto.ImageDTO;
 import com.mongodb.DBObject;
 import com.mongodb.client.gridfs.GridFSFindIterable;
 import com.mongodb.client.gridfs.model.GridFSFile;
-import org.apache.commons.compress.utils.IOUtils;
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.AfterEach;
+import org.apache.commons.io.IOUtils;
+import org.bson.Document;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.mockito.Mock;
+import org.mockito.MockSettings;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.gridfs.GridFsResource;
 import org.springframework.data.mongodb.gridfs.GridFsTemplate;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Spliterator;
 
+import static java.util.Collections.singletonList;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
 class MongoFileStorageServiceTest {
 
-    @Autowired
-    MongoFileStorageService mongoFileStorageService;
+    @Mock
+    private GridFsTemplate gridFsTemplate;
 
-    @Autowired
-    GridFsTemplate gridFsTemplate;
+    private MongoFileStorageService fileStorageService;
 
-    @AfterEach
-    void teardown(){
-        GridFSFindIterable gridFSFiles = gridFsTemplate.find(new Query());
-
-        for (GridFSFile file : gridFSFiles) {
-            gridFsTemplate.delete(Query.query(Criteria.where("_id").is(file.getId())));
-        }
+    @BeforeEach
+    void setup(){
+        MockitoAnnotations.initMocks(this);
+        fileStorageService = new MongoFileStorageService(gridFsTemplate);
     }
 
     @Test
     void save() throws IOException {
-        InputStream resourceAsStream = MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png");
+        InputStream inputStream = mock(InputStream.class);
+        MultipartFile multipartFileMock = mock(MultipartFile.class);
+        when(multipartFileMock.getContentType()).thenReturn("image/png");
+        when(multipartFileMock.getOriginalFilename()).thenReturn("filename");
+        when(multipartFileMock.getInputStream()).thenReturn(inputStream);
 
-        byte[] imageBytes = IOUtils.toByteArray(resourceAsStream);
+        fileStorageService.save("test", multipartFileMock);
 
-        MultipartFile multipartFile = new MockMultipartFile("test", imageBytes);
-        mongoFileStorageService.save("teste", multipartFile);
-
-        GridFSFile savedFile = gridFsTemplate.findOne(Query.query(Criteria.where("metadata.userId").is("teste")));
-        Assertions.assertThat(savedFile).isNotNull();
+        verify(gridFsTemplate).store(eq(inputStream),
+                        eq("filename"),
+                        eq("image/png"),
+                        any(DBObject.class));
     }
 
     @Test
     void delete() {
-        addImageToMongo("foo", "teste");
+        fileStorageService.delete("test", "filename");
 
-        mongoFileStorageService.delete("foo", "teste");
-
-        GridFSFile deletedFile = gridFsTemplate.findOne(Query.query(Criteria.where("metadata.userId").is("foo")));
-
-        Assertions.assertThat(deletedFile).isNull();
+        verify(gridFsTemplate).delete(Query.query(Criteria
+                .where("metadata.userId").is("test")
+                .and("filename").is("filename")));
     }
 
     @Test
     void find() throws IOException {
-        addImageToMongo("foo", "teste");
+        InputStream resourceAsStream = MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png");
 
-        byte[] bytes = mongoFileStorageService.find("foo", "teste");
+        GridFSFile gridFSFileMock = mock(GridFSFile.class);
+        Document documentMock = mock(Document.class);
+        GridFsResource gridFsResourceMock = mock(GridFsResource.class);
+        when(gridFsTemplate.findOne(any())).thenReturn(gridFSFileMock);
+        when(gridFsTemplate.getResource(gridFSFileMock)).thenReturn(gridFsResourceMock);
 
-        byte[] originalByteArray = IOUtils.toByteArray(MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png"));
+        when(gridFSFileMock.getMetadata()).thenReturn(documentMock);
+        when(documentMock.getString("contentType")).thenReturn("image/png");
+        when(gridFsResourceMock.getInputStream()).thenReturn(resourceAsStream);
 
-        Assertions.assertThat(bytes).hasSameSizeAs(originalByteArray);
-        Assertions.assertThat(bytes).containsExactly(originalByteArray);
+
+        ImageDTO imageDTO = fileStorageService.find("test", "filename");
+
+        verify(gridFsTemplate).findOne(any());
+        verify(gridFsTemplate).getResource(gridFSFileMock);
+
+        byte[] imageBytes = IOUtils.toByteArray(MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png"));
+
+        Assertions.assertEquals("image/png", imageDTO.getContentType());
+        Assertions.assertArrayEquals(imageBytes, imageDTO.getImage());
+    }
+
+    @Test
+    void findAllByUser() {
+        GridFSFindIterable gridFSFindIterableMock = mock(GridFSFindIterable.class);
+        GridFSFile gridFSFileMock = mock(GridFSFile.class);
+        Document documentMock = mock(Document.class);
+
+        when(documentMock.getString("contentType")).thenReturn("image/png");
+        when(gridFSFileMock.getFilename()).thenReturn("filename");
+        when(gridFSFileMock.getMetadata()).thenReturn(documentMock);
+        when(gridFSFindIterableMock.spliterator()).thenReturn(singletonList(gridFSFileMock).spliterator());
+        when(gridFsTemplate.find(any())).thenReturn(gridFSFindIterableMock);
+        List<FileDTO> allByUser = fileStorageService.findAllByUser("test");
+
+        verify(gridFsTemplate).find(any());
+
+        Assertions.assertEquals(1, allByUser.size());
+        FileDTO fileDTO = allByUser.get(0);
+
+        Assertions.assertEquals("filename", fileDTO.getFilename());
+        Assertions.assertEquals("image/png", fileDTO.getContentType());
+        Assertions.assertEquals("test", fileDTO.getUserId());
+        Assertions.assertEquals("Concluído", fileDTO.getStatus());
     }
 
     @Test
     void findAll() {
-        addImageToMongo("foo", "teste1");
-        addImageToMongo("foo", "teste2");
-        addImageToMongo("foo", "teste3");
+        GridFSFindIterable gridFSFindIterableMock = mock(GridFSFindIterable.class);
+        GridFSFile gridFSFileMock = mock(GridFSFile.class);
+        Document documentMock = mock(Document.class);
 
-        List<FileDTO> allFiles = mongoFileStorageService.findAllByUser("foo");
+        when(documentMock.getString("contentType")).thenReturn("image/png");
+        when(documentMock.getString("userId")).thenReturn("test");
+        when(gridFSFileMock.getFilename()).thenReturn("filename");
+        when(gridFSFileMock.getMetadata()).thenReturn(documentMock);
+        when(gridFSFindIterableMock.spliterator()).thenReturn(singletonList(gridFSFileMock).spliterator());
+        when(gridFsTemplate.find(any())).thenReturn(gridFSFindIterableMock);
 
-        List<String> fileNames = allFiles.stream().map(FileDTO::getFilename).collect(Collectors.toList());
+        List<FileDTO> allByUser = fileStorageService.findAll("");
 
-        Assertions.assertThat(fileNames).containsAll(Arrays.asList("teste1", "teste2", "teste3"));
-    }
+        verify(gridFsTemplate).find(any());
 
+        Assertions.assertEquals(1, allByUser.size());
+        FileDTO fileDTO = allByUser.get(0);
 
-    @Test
-    void findAllFilesInAllUsers() {
-        addImageToMongo("foo", "teste1");
-        addImageToMongo("bar", "teste2");
-
-        List<FileDTO> list = mongoFileStorageService.findAll("");
-
-        List<String> fileNames = list.stream().map(FileDTO::getFilename).collect(Collectors.toList());
-        Assertions.assertThat(fileNames).containsAll(Arrays.asList("teste1", "teste2"));
-    }
-
-    private void addImageToMongo(String userId, String filename) {
-        InputStream resourceAsStream = MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png");
-        DBObject metadata = new BasicDBObjectBuilder()
-                .add("userId", userId)
-                .get();
-
-        gridFsTemplate.store(resourceAsStream, filename, "image/png", metadata);
+        Assertions.assertEquals("filename", fileDTO.getFilename());
+        Assertions.assertEquals("image/png", fileDTO.getContentType());
+        Assertions.assertEquals("test", fileDTO.getUserId());
+        Assertions.assertEquals("Concluído", fileDTO.getStatus());
     }
 }
