@@ -1,8 +1,11 @@
 package br.com.belfalas.restfileupload.service;
 
+import br.com.belfalas.restfileupload.dto.FileDTO;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 public interface FileStorageService {
 
@@ -10,10 +13,10 @@ public interface FileStorageService {
 
     void delete(String userId, String filename);
 
-    void find(String userId, String filename);
+    byte[] find(String userId, String filename) throws IOException;
 
-    void findAll(String userId);
+    List<FileDTO> findAllByUser(String userId);
 
-    void findAllFilesInAllUsers();
+    List<FileDTO> findAll(String filename);
 
 }

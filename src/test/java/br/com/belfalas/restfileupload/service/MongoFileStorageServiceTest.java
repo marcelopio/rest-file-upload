@@ -1,5 +1,6 @@
 package br.com.belfalas.restfileupload.service;
 
+import br.com.belfalas.restfileupload.dto.FileDTO;
 import com.mongodb.BasicDBObjectBuilder;
 import com.mongodb.DBObject;
 import com.mongodb.client.gridfs.GridFSFindIterable;
@@ -19,6 +20,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -55,13 +59,7 @@ class MongoFileStorageServiceTest {
 
     @Test
     void delete() {
-        InputStream resourceAsStream = MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png");
-        DBObject metadata = new BasicDBObjectBuilder()
-                .add("userId", "foo")
-                .get();
-
-
-        gridFsTemplate.store(resourceAsStream, "teste", "image/png", metadata);
+        addImageToMongo("foo", "teste");
 
         mongoFileStorageService.delete("foo", "teste");
 
@@ -71,17 +69,48 @@ class MongoFileStorageServiceTest {
     }
 
     @Test
-    void find() {
-        mongoFileStorageService.find(null, null);
+    void find() throws IOException {
+        addImageToMongo("foo", "teste");
+
+        byte[] bytes = mongoFileStorageService.find("foo", "teste");
+
+        byte[] originalByteArray = IOUtils.toByteArray(MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png"));
+
+        Assertions.assertThat(bytes).hasSameSizeAs(originalByteArray);
+        Assertions.assertThat(bytes).containsExactly(originalByteArray);
     }
 
     @Test
     void findAll() {
-        mongoFileStorageService.findAll(null);
+        addImageToMongo("foo", "teste1");
+        addImageToMongo("foo", "teste2");
+        addImageToMongo("foo", "teste3");
+
+        List<FileDTO> allFiles = mongoFileStorageService.findAllByUser("foo");
+
+        List<String> fileNames = allFiles.stream().map(FileDTO::getFilename).collect(Collectors.toList());
+
+        Assertions.assertThat(fileNames).containsAll(Arrays.asList("teste1", "teste2", "teste3"));
     }
+
 
     @Test
     void findAllFilesInAllUsers() {
-        mongoFileStorageService.findAllFilesInAllUsers();
+        addImageToMongo("foo", "teste1");
+        addImageToMongo("bar", "teste2");
+
+        List<FileDTO> list = mongoFileStorageService.findAll("");
+
+        List<String> fileNames = list.stream().map(FileDTO::getFilename).collect(Collectors.toList());
+        Assertions.assertThat(fileNames).containsAll(Arrays.asList("teste1", "teste2"));
+    }
+
+    private void addImageToMongo(String userId, String filename) {
+        InputStream resourceAsStream = MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png");
+        DBObject metadata = new BasicDBObjectBuilder()
+                .add("userId", userId)
+                .get();
+
+        gridFsTemplate.store(resourceAsStream, filename, "image/png", metadata);
     }
 }
