@@ -143,6 +143,30 @@ class FileUploadControllerIntegrationTest {
     }
 
     @Test
+    void uploadFileGt5Mb() {
+        ClassPathResource resource = new ClassPathResource("/teste10mb.jpg", getClass());
+
+        MultiValueMap<String, Object> map = new LinkedMultiValueMap<String, Object>();
+        map.add("file", resource);
+
+        ResponseEntity<String> responseEntity = testRestTemplate.postForEntity("/fileUpload/v1/test", map, String.class);
+
+        assertThat(responseEntity.getStatusCode()).isEqualByComparingTo(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @Test
+    void uploadFileNotImg() {
+        ClassPathResource resource = new ClassPathResource("/teste.txt", getClass());
+
+        MultiValueMap<String, Object> map = new LinkedMultiValueMap<String, Object>();
+        map.add("file", resource);
+
+        ResponseEntity<String> responseEntity = testRestTemplate.postForEntity("/fileUpload/v1/test", map, String.class);
+
+        assertThat(responseEntity.getStatusCode()).isEqualByComparingTo(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @Test
     void uploadFileThrowsFailedToReadFileException() throws FailedToReadFileException {
         BDDMockito.doThrow(FailedToReadFileException.class).when(fileStorageService).save(eq("test"), any(MultipartFile.class));
         ClassPathResource resource = new ClassPathResource("/testes.png", getClass());
