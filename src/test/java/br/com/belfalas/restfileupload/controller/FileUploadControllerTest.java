@@ -2,6 +2,8 @@ package br.com.belfalas.restfileupload.controller;
 
 import br.com.belfalas.restfileupload.dto.FileDTO;
 import br.com.belfalas.restfileupload.dto.ImageDTO;
+import br.com.belfalas.restfileupload.exception.FailedToReadFileException;
+import br.com.belfalas.restfileupload.exception.FileNotFoundInStorageException;
 import br.com.belfalas.restfileupload.service.FileStorageService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +75,7 @@ class FileUploadControllerTest {
     }
 
     @Test
-    void getFile() throws IOException {
+    void getFile() throws FileNotFoundInStorageException, FailedToReadFileException {
         ImageDTO imageDTO = new ImageDTO("image/png", new byte[0]);
 
         when(fileStorageService.find("test", "filename")).thenReturn(imageDTO);
@@ -86,7 +88,7 @@ class FileUploadControllerTest {
     }
 
     @Test
-    void uploadFile() throws IOException {
+    void uploadFile() throws FailedToReadFileException {
         MultipartFile multipartFileMock = mock(MultipartFile.class);
         when(multipartFileMock.getOriginalFilename()).thenReturn("filename");
 
@@ -99,10 +101,8 @@ class FileUploadControllerTest {
 
     @Test
     void deleteFile() {
-        ResponseEntity<String> responseEntity = fileUploadController.deleteFile("test", "filename");
+        fileUploadController.deleteFile("test", "filename");
 
         verify(fileStorageService).delete("test", "filename");
-
-        assertEquals("File filename deleted successfully", responseEntity.getBody());
     }
 }

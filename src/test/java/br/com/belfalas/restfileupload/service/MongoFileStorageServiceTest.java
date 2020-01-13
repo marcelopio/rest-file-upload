@@ -2,6 +2,8 @@ package br.com.belfalas.restfileupload.service;
 
 import br.com.belfalas.restfileupload.dto.FileDTO;
 import br.com.belfalas.restfileupload.dto.ImageDTO;
+import br.com.belfalas.restfileupload.exception.FailedToReadFileException;
+import br.com.belfalas.restfileupload.exception.FileNotFoundInStorageException;
 import com.mongodb.DBObject;
 import com.mongodb.client.gridfs.GridFSFindIterable;
 import com.mongodb.client.gridfs.model.GridFSFile;
@@ -14,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.MockSettings;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.mockito.exceptions.base.MockitoException;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.gridfs.GridFsResource;
@@ -47,7 +50,7 @@ class MongoFileStorageServiceTest {
     }
 
     @Test
-    void save() throws IOException {
+    void save() throws IOException, FailedToReadFileException {
         InputStream inputStream = mock(InputStream.class);
         MultipartFile multipartFileMock = mock(MultipartFile.class);
         when(multipartFileMock.getContentType()).thenReturn("image/png");
@@ -63,6 +66,16 @@ class MongoFileStorageServiceTest {
     }
 
     @Test
+    void saveThrowsException() throws IOException {
+        MultipartFile multipartFileMock = mock(MultipartFile.class);
+        when(multipartFileMock.getContentType()).thenReturn("image/png");
+        when(multipartFileMock.getOriginalFilename()).thenReturn("filename");
+        when(multipartFileMock.getInputStream()).thenThrow(IOException.class);
+
+        Assertions.assertThrows(FailedToReadFileException.class, () -> fileStorageService.save("test", multipartFileMock));
+    }
+
+    @Test
     void delete() {
         fileStorageService.delete("test", "filename");
 
@@ -72,7 +85,7 @@ class MongoFileStorageServiceTest {
     }
 
     @Test
-    void find() throws IOException {
+    void find() throws IOException, FileNotFoundInStorageException, FailedToReadFileException {
         InputStream resourceAsStream = MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png");
 
         GridFSFile gridFSFileMock = mock(GridFSFile.class);
@@ -95,6 +108,31 @@ class MongoFileStorageServiceTest {
 
         Assertions.assertEquals("image/png", imageDTO.getContentType());
         Assertions.assertArrayEquals(imageBytes, imageDTO.getImage());
+    }
+
+    @Test
+    void findNotFound(){
+        when(gridFsTemplate.findOne(any())).thenReturn(null);
+
+        Assertions.assertThrows(FileNotFoundInStorageException.class, () -> fileStorageService.find("test", "filename"));
+    }
+
+    @Test
+    void findFailedToRead() throws IOException {
+        InputStream resourceAsStream = MongoFileStorageServiceTest.class.getResourceAsStream("/testes.png");
+
+        GridFSFile gridFSFileMock = mock(GridFSFile.class);
+        Document documentMock = mock(Document.class);
+        GridFsResource gridFsResourceMock = mock(GridFsResource.class);
+        when(gridFsTemplate.findOne(any())).thenReturn(gridFSFileMock);
+        when(gridFsTemplate.getResource(gridFSFileMock)).thenReturn(gridFsResourceMock);
+
+        when(gridFSFileMock.getMetadata()).thenReturn(documentMock);
+        when(documentMock.getString("contentType")).thenReturn("image/png");
+        when(gridFsResourceMock.getInputStream()).thenThrow(IOException.class);
+
+
+        Assertions.assertThrows(FailedToReadFileException.class, () -> fileStorageService.find("test", "filename"));
     }
 
     @Test

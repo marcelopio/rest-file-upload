@@ -2,6 +2,8 @@ package br.com.belfalas.restfileupload.service;
 
 import br.com.belfalas.restfileupload.dto.FileDTO;
 import br.com.belfalas.restfileupload.dto.ImageDTO;
+import br.com.belfalas.restfileupload.exception.FailedToReadFileException;
+import br.com.belfalas.restfileupload.exception.FileNotFoundInStorageException;
 import com.mongodb.BasicDBObjectBuilder;
 import com.mongodb.DBObject;
 import com.mongodb.client.gridfs.GridFSFindIterable;
@@ -43,7 +45,7 @@ class MongoFileStorageServiceIntegrationTest {
     }
 
     @Test
-    void save() throws IOException {
+    void save() throws FailedToReadFileException, IOException {
         InputStream resourceAsStream = MongoFileStorageServiceIntegrationTest.class.getResourceAsStream("/testes.png");
 
         byte[] imageBytes = IOUtils.toByteArray(resourceAsStream);
@@ -81,7 +83,7 @@ class MongoFileStorageServiceIntegrationTest {
     }
 
     @Test
-    void find() throws IOException {
+    void find() throws IOException, FileNotFoundInStorageException, FailedToReadFileException {
         addImageToMongo("foo", "test");
 
         ImageDTO result = mongoFileStorageService.find("foo", "test");

@@ -1,5 +1,8 @@
 package br.com.belfalas.restfileupload.dto;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 public class ImageDTO {
 
     private String contentType;
@@ -27,5 +30,28 @@ public class ImageDTO {
 
     public void setImage(byte[] image) {
         this.image = image;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ImageDTO imageDTO = (ImageDTO) o;
+        return Objects.equals(contentType, imageDTO.contentType) &&
+                Arrays.equals(image, imageDTO.image);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(contentType);
+        result = 31 * result + Arrays.hashCode(image);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "ImageDTO{" +
+                "contentType='" + contentType + '\'' +
+                '}';
     }
 }

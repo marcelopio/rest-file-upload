@@ -2,12 +2,14 @@ package br.com.belfalas.restfileupload.controller;
 
 import br.com.belfalas.restfileupload.dto.FileDTO;
 import br.com.belfalas.restfileupload.dto.ImageDTO;
+import br.com.belfalas.restfileupload.exception.FailedToReadFileException;
+import br.com.belfalas.restfileupload.exception.FileNotFoundInStorageException;
 import br.com.belfalas.restfileupload.service.FileStorageService;
 import br.com.belfalas.restfileupload.validation.ValidUploadImageFile;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.util.Pair;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -58,7 +60,7 @@ public class FileUploadController {
             @ApiParam(value = "The filename of the file to be downloaded", required = true)
             @PathVariable
                     String filename
-    ) throws IOException {
+    ) throws FailedToReadFileException, FileNotFoundInStorageException {
         ImageDTO result = fileStorageService.find(userId, filename);
 
         MediaType mediaType = MediaType.parseMediaType(result.getContentType());
@@ -77,7 +79,7 @@ public class FileUploadController {
             @RequestParam("file")
             @ValidUploadImageFile
                     MultipartFile file
-    ) throws IOException {
+    ) throws FailedToReadFileException {
         fileStorageService.save(userId, file);
 
         return ResponseEntity.ok(String.format("File %s uploaded successfully", file.getOriginalFilename()));
@@ -85,7 +87,7 @@ public class FileUploadController {
 
     @ApiOperation("Delete the file of the user")
     @DeleteMapping("/{userId}/{filename}")
-    public ResponseEntity<String> deleteFile(
+    public void deleteFile(
             @ApiParam(value = "The userId to delete the file from", required = true)
             @PathVariable
                     String userId,
@@ -93,8 +95,15 @@ public class FileUploadController {
             @PathVariable String filename
     ) {
         fileStorageService.delete(userId, filename);
-
-        return ResponseEntity.ok(String.format("File %s deleted successfully", filename));
     }
 
+    @ExceptionHandler(FileNotFoundInStorageException.class)
+    public ResponseEntity<?> handleFileNotFoundException(FileNotFoundInStorageException e){
+        return ResponseEntity.notFound().build();
+    }
+
+    @ExceptionHandler(FailedToReadFileException.class)
+    public ResponseEntity<?> handleFailedToReadFileException(FailedToReadFileException e){
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+    }
 }

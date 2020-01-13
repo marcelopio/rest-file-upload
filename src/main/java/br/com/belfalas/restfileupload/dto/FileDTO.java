@@ -3,6 +3,8 @@ package br.com.belfalas.restfileupload.dto;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 
+import java.util.Objects;
+
 @ApiModel(description = "Response to the find methods")
 public class FileDTO {
     @ApiModelProperty(notes = "The userId that uploaded the file")
@@ -54,5 +56,31 @@ public class FileDTO {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        FileDTO fileDTO = (FileDTO) o;
+        return Objects.equals(userId, fileDTO.userId) &&
+                Objects.equals(filename, fileDTO.filename) &&
+                Objects.equals(contentType, fileDTO.contentType) &&
+                Objects.equals(status, fileDTO.status);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(userId, filename, contentType, status);
+    }
+
+    @Override
+    public String toString() {
+        return "FileDTO{" +
+                "userId='" + userId + '\'' +
+                ", filename='" + filename + '\'' +
+                ", contentType='" + contentType + '\'' +
+                ", status='" + status + '\'' +
+                '}';
     }
 }

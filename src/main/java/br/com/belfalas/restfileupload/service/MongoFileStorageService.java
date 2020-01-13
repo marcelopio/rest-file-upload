@@ -2,6 +2,8 @@ package br.com.belfalas.restfileupload.service;
 
 import br.com.belfalas.restfileupload.dto.FileDTO;
 import br.com.belfalas.restfileupload.dto.ImageDTO;
+import br.com.belfalas.restfileupload.exception.FailedToReadFileException;
+import br.com.belfalas.restfileupload.exception.FileNotFoundInStorageException;
 import com.mongodb.BasicDBObjectBuilder;
 import com.mongodb.DBObject;
 import com.mongodb.client.gridfs.GridFSFindIterable;
@@ -11,7 +13,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.gridfs.GridFsResource;
 import org.springframework.data.mongodb.gridfs.GridFsTemplate;
-import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,13 +33,17 @@ public class MongoFileStorageService implements FileStorageService {
     }
 
     @Override
-    public void save(String userId, MultipartFile file) throws IOException {
+    public void save(String userId, MultipartFile file) throws FailedToReadFileException {
         DBObject metadata = new BasicDBObjectBuilder()
                 .add("userId", userId)
                 .add("contentType", Objects.requireNonNull(file.getContentType()))
                 .get();
 
-        gridFsTemplate.store(file.getInputStream(), file.getOriginalFilename(), file.getContentType(), metadata);
+        try {
+            gridFsTemplate.store(file.getInputStream(), file.getOriginalFilename(), file.getContentType(), metadata);
+        } catch (IOException e) {
+            throw new FailedToReadFileException("Failed to read file from sent by client", e);
+        }
     }
 
     @Override
@@ -49,14 +54,23 @@ public class MongoFileStorageService implements FileStorageService {
     }
 
     @Override
-    public ImageDTO find(String userId, String filename) throws IOException {
+    public ImageDTO find(String userId, String filename) throws FailedToReadFileException, FileNotFoundInStorageException {
         GridFSFile gridFSFile = gridFsTemplate.findOne(Query.query(Criteria
                 .where("metadata.userId").is(userId)
                 .and("filename").is(filename)));
 
+        if (gridFSFile == null){
+            throw new FileNotFoundInStorageException(String.format("File %s not found", filename));
+        }
+
         GridFsResource resource = gridFsTemplate.getResource(gridFSFile);
 
-        return new ImageDTO(gridFSFile.getMetadata().getString("contentType"), IOUtils.toByteArray(resource.getInputStream()));
+        try {
+            byte[] byteArray = IOUtils.toByteArray(resource.getInputStream());
+            return new ImageDTO(gridFSFile.getMetadata().getString("contentType"), byteArray);
+        } catch (IOException e) {
+            throw new FailedToReadFileException(String.format("File %s was not read", filename), e);
+        }
     }
 
     @Override
